@@ -37,8 +37,7 @@ interface Email {
   hash: string;
 }
 
-const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY;
-const ALCHEMY_URL = `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`;
+const MULTIVERSX_API_URL = import.meta.env.VITE_MULTIVERSX_API_URL;
 const CONTRACT_ADDRESS = import.meta.env.VITE_EMAIL_CONTRACT_ADDRESS;
 
 const CONTRACT_ABI = [
@@ -67,47 +66,42 @@ const EmailSystem: React.FC = () => {
   useEffect(() => {
     const initContract = async () => {
       try {
-        if (!ALCHEMY_API_KEY || !CONTRACT_ADDRESS) {
+        if (!MULTIVERSX_API_URL || !CONTRACT_ADDRESS) {
           throw new Error('Configurações do contrato não encontradas. Verifique o arquivo .env');
         }
 
-        // Verifica se o MetaMask está instalado
-        if (!window.ethereum) {
-          throw new Error('MetaMask não está instalado. Por favor, instale o MetaMask para continuar.');
+        if (!window.multiversx) {
+          throw new Error('MultiversX Wallet não está instalado. Por favor, instale a MultiversX Wallet para continuar.');
         }
 
-        // Verifica se o MetaMask está conectado à rede correta
         console.log('Verificando rede...');
-        const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+        const chainId = await window.multiversx.request({ method: 'mvx_chainId' });
         console.log('Chain ID:', chainId);
         
         const expectedChainId = import.meta.env.VITE_CHAIN_ID;
         console.log('Chain ID esperado:', expectedChainId);
         
-        if (chainId !== `0x${Number(expectedChainId).toString(16)}`) {
-          throw new Error(`Por favor, conecte-se à rede ${import.meta.env.VITE_NETWORK} no MetaMask.`);
+        if (chainId !== expectedChainId) {
+          throw new Error(`Por favor, conecte-se à rede ${import.meta.env.VITE_NETWORK} na MultiversX Wallet.`);
         }
 
-        // Solicita conexão com o MetaMask
         try {
-          await window.ethereum.request({ method: 'eth_requestAccounts' });
+          await window.multiversx.request({ method: 'mvx_requestAccounts' });
         } catch (error) {
           if (error.code === 4001) {
-            throw new Error('Por favor, autorize o acesso à sua carteira no MetaMask.');
+            throw new Error('Por favor, autorize o acesso à sua carteira na MultiversX Wallet.');
           }
           throw error;
         }
 
-        // Usa o provider do MetaMask
-        console.log('Inicializando provider do MetaMask...');
-        const provider = new ethers.BrowserProvider(window.ethereum);
+        console.log('Inicializando provider da MultiversX...');
+        const provider = new ethers.BrowserProvider(window.multiversx);
         console.log('Provider inicializado');
         
         console.log('Obtendo signer...');
         const signer = await provider.getSigner();
         console.log('Signer obtido');
         
-        // Verifica se o endereço do contrato é válido
         console.log('Endereço do contrato do .env:', CONTRACT_ADDRESS);
         if (!ethers.isAddress(CONTRACT_ADDRESS)) {
           throw new Error('Endereço do contrato inválido. Verifique o arquivo .env');
@@ -115,7 +109,6 @@ const EmailSystem: React.FC = () => {
 
         console.log('Tentando criar contrato com endereço:', CONTRACT_ADDRESS);
         
-        // Verifica se o contrato existe na rede
         console.log('Verificando código do contrato...');
         const code = await provider.getCode(CONTRACT_ADDRESS);
         console.log('Código do contrato:', code);
@@ -132,14 +125,12 @@ const EmailSystem: React.FC = () => {
 
         console.log('Contrato encontrado! Inicializando...');
         
-        // Cria o contrato com o signer
         const emailContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
         setContract(emailContract);
         
         const account = await signer.getAddress();
         console.log('Conta conectada:', account);
         
-        // Testa as funções do contrato
         console.log('Testando funções do contrato...');
         const inboxEmails = await emailContract.getInbox();
         console.log('Inbox:', inboxEmails);
@@ -155,17 +146,9 @@ const EmailSystem: React.FC = () => {
         setSpamList(spamAddresses);
       } catch (error) {
         console.error('Erro ao inicializar contrato:', error);
-        let errorMessage = 'Erro desconhecido';
-        
-        if (error instanceof Error) {
-          errorMessage = error.message;
-        } else if (typeof error === 'string') {
-          errorMessage = error;
-        }
-        
         toast({
-          title: 'Erro ao inicializar contrato',
-          description: errorMessage,
+          title: 'Erro',
+          description: error instanceof Error ? error.message : 'Erro desconhecido',
           status: 'error',
           duration: 5000,
         });
@@ -173,7 +156,7 @@ const EmailSystem: React.FC = () => {
     };
 
     initContract();
-  }, [toast]);
+  }, []);
 
   const handleSendEmail = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -331,7 +314,7 @@ const EmailSystem: React.FC = () => {
   return (
     <Container maxW="container.md" py={8}>
       <VStack spacing={6}>
-        <Heading>Sistema de E-mail Web3</Heading>
+        <Heading>Email System</Heading>
 
         <Tabs w="100%">
           <TabList>

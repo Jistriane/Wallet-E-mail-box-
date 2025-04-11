@@ -14,8 +14,7 @@ import {
 } from '@chakra-ui/react';
 import * as bip39 from 'bip39';
 
-const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY;
-const ALCHEMY_URL = `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`;
+const MULTIVERSX_API_URL = import.meta.env.VITE_MULTIVERSX_API_URL;
 
 interface WalletError {
   message: string;
@@ -36,16 +35,16 @@ const Wallet: React.FC = () => {
 
   useEffect(() => {
     const checkConnection = async () => {
-      if (window.ethereum) {
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+      if (window.multiversx) {
+        const accounts = await window.multiversx.request({ method: 'mvx_accounts' });
         setIsConnected(accounts.length > 0);
       }
     };
 
     checkConnection();
 
-    if (window.ethereum) {
-      window.ethereum.on('accountsChanged', (accounts: string[]) => {
+    if (window.multiversx) {
+      window.multiversx.on('accountsChanged', (accounts: string[]) => {
         setIsConnected(accounts.length > 0);
         if (accounts.length === 0) {
           setWallet(null);
@@ -55,19 +54,19 @@ const Wallet: React.FC = () => {
     }
 
     return () => {
-      if (window.ethereum) {
-        window.ethereum.removeAllListeners('accountsChanged');
+      if (window.multiversx) {
+        window.multiversx.removeAllListeners('accountsChanged');
       }
     };
   }, []);
 
   const connectWallet = async () => {
     try {
-      if (!window.ethereum) {
-        throw new Error('MetaMask não está instalado');
+      if (!window.multiversx) {
+        throw new Error('MultiversX Wallet não está instalado');
       }
 
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      const accounts = await window.multiversx.request({ method: 'mvx_requestAccounts' });
       if (accounts.length > 0) {
         setIsConnected(true);
         toast({
@@ -83,10 +82,10 @@ const Wallet: React.FC = () => {
 
   const disconnectWallet = async () => {
     try {
-      if (window.ethereum) {
-        await window.ethereum.request({
-          method: 'wallet_revokePermissions',
-          params: [{ eth_accounts: {} }],
+      if (window.multiversx) {
+        await window.multiversx.request({
+          method: 'mvx_revokePermissions',
+          params: [{ mvx_accounts: {} }],
         });
         setIsConnected(false);
         setWallet(null);
@@ -116,7 +115,6 @@ const Wallet: React.FC = () => {
     try {
       const newWallet = ethers.Wallet.createRandom();
       setWallet(newWallet);
-      // Gerar e mostrar a seed phrase
       const mnemonic = newWallet.mnemonic?.phrase;
       if (mnemonic) {
         toast({
@@ -160,26 +158,39 @@ const Wallet: React.FC = () => {
   };
 
   const checkBalance = async () => {
-    if (!wallet || !ALCHEMY_API_KEY) return;
+    if (!wallet || !MULTIVERSX_API_URL) return;
     try {
-      const provider = new ethers.JsonRpcProvider(ALCHEMY_URL);
-      const balance = await provider.getBalance(wallet.address);
-      setBalance(ethers.formatEther(balance));
+      const response = await fetch(`${MULTIVERSX_API_URL}/accounts/${wallet.address}`);
+      const data = await response.json();
+      setBalance(data.balance);
     } catch (error) {
       handleError(error);
     }
   };
 
   const sendTransaction = async () => {
-    if (!wallet || !recipientAddress || !amount || !ALCHEMY_API_KEY) return;
+    if (!wallet || !recipientAddress || !amount || !MULTIVERSX_API_URL) return;
     try {
-      const provider = new ethers.JsonRpcProvider(ALCHEMY_URL);
-      const connectedWallet = wallet.connect(provider);
-      const tx = await connectedWallet.sendTransaction({
-        to: recipientAddress,
-        value: ethers.parseEther(amount),
+      const transaction = {
+        nonce: 0,
+        value: amount,
+        receiver: recipientAddress,
+        sender: wallet.address,
+        gasPrice: 1000000000,
+        gasLimit: 50000,
+        chainID: 'D',
+        version: 1,
+      };
+
+      const response = await fetch(`${MULTIVERSX_API_URL}/transaction/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(transaction),
       });
-      await tx.wait();
+
+      const data = await response.json();
       toast({
         title: 'Transação enviada com sucesso!',
         status: 'success',
@@ -193,7 +204,10 @@ const Wallet: React.FC = () => {
   const signMessage = async () => {
     if (!wallet || !messageToSign) return;
     try {
-      const signature = await wallet.signMessage(messageToSign);
+      const signature = await window.multiversx?.request({
+        method: 'mvx_signMessage',
+        params: [messageToSign],
+      });
       setSignedMessage(signature);
       toast({
         title: 'Mensagem assinada com sucesso!',
@@ -205,77 +219,10 @@ const Wallet: React.FC = () => {
     }
   };
 
-  const createOfflineTransaction = async () => {
-    if (!wallet || !recipientAddress || !amount || !ALCHEMY_API_KEY) {
-      toast({
-        title: 'Erro',
-        description: 'Por favor, preencha todos os campos necessários',
-        status: 'error',
-        duration: 3000,
-      });
-      return;
-    }
-
-    try {
-      const provider = new ethers.JsonRpcProvider(ALCHEMY_URL);
-      const nonce = await provider.getTransactionCount(wallet.address);
-      const gasPrice = await provider.getFeeData();
-      
-      const tx = {
-        to: recipientAddress,
-        value: ethers.parseEther(amount),
-        nonce,
-        gasPrice: gasPrice.gasPrice,
-        gasLimit: ethers.parseUnits('21000', 'wei'),
-        chainId: 1, // Ethereum Mainnet
-      };
-
-      const signedTx = await wallet.signTransaction(tx);
-      setRawTransaction(signedTx);
-      
-      toast({
-        title: 'Transação assinada com sucesso!',
-        description: 'A transação está pronta para ser enviada',
-        status: 'success',
-        duration: 3000,
-      });
-    } catch (error) {
-      handleError(error);
-    }
-  };
-
-  const sendSignedTransaction = async () => {
-    if (!rawTransaction || !ALCHEMY_API_KEY) {
-      toast({
-        title: 'Erro',
-        description: 'Nenhuma transação assinada disponível',
-        status: 'error',
-        duration: 3000,
-      });
-      return;
-    }
-
-    try {
-      const provider = new ethers.JsonRpcProvider(ALCHEMY_URL);
-      const tx = await provider.broadcastTransaction(rawTransaction);
-      await tx.wait();
-      
-      setSignedTransaction(tx.hash);
-      toast({
-        title: 'Transação enviada com sucesso!',
-        description: `Hash: ${tx.hash}`,
-        status: 'success',
-        duration: 5000,
-      });
-    } catch (error) {
-      handleError(error);
-    }
-  };
-
   return (
     <Container maxW="container.md" py={8}>
       <VStack spacing={6}>
-        <Heading>Wallet Web3</Heading>
+        <Heading>MultiversX Wallet</Heading>
         
         {!isConnected ? (
           <Button colorScheme="blue" onClick={connectWallet}>
@@ -316,10 +263,10 @@ const Wallet: React.FC = () => {
               Verificar Saldo
             </Button>
 
-            <Text>Saldo: {balance} ETH</Text>
+            <Text>Saldo: {balance} EGLD</Text>
 
             <Box w="100%">
-              <Text mb={2}>Enviar ETH:</Text>
+              <Text mb={2}>Enviar EGLD:</Text>
               <Input
                 value={recipientAddress}
                 onChange={(e) => setRecipientAddress(e.target.value)}
@@ -329,7 +276,7 @@ const Wallet: React.FC = () => {
               <Input
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                placeholder="Quantidade em ETH"
+                placeholder="Quantidade em EGLD"
                 type="number"
                 step="0.000000000000000001"
               />
@@ -356,48 +303,6 @@ const Wallet: React.FC = () => {
                   <Text>Assinatura:</Text>
                   <Text fontSize="sm" isTruncated>
                     {signedMessage}
-                  </Text>
-                </Box>
-              )}
-            </Box>
-
-            <Divider />
-
-            <Box mt={4}>
-              <Heading size="md">Transações Off-line</Heading>
-              <VStack spacing={4} mt={2}>
-                <Input
-                  placeholder="Endereço do destinatário"
-                  value={recipientAddress}
-                  onChange={(e) => setRecipientAddress(e.target.value)}
-                />
-                <Input
-                  placeholder="Quantidade (ETH)"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-                <Button colorScheme="blue" onClick={createOfflineTransaction}>
-                  Criar Transação Off-line
-                </Button>
-              </VStack>
-              {rawTransaction && (
-                <Box mt={2}>
-                  <Text>Transação Assinada:</Text>
-                  <Text fontSize="sm" isTruncated>
-                    {rawTransaction}
-                  </Text>
-                </Box>
-              )}
-              {rawTransaction && (
-                <Button mt={2} colorScheme="green" onClick={sendSignedTransaction}>
-                  Enviar Transação
-                </Button>
-              )}
-              {signedTransaction && (
-                <Box mt={2}>
-                  <Text>Transação Enviada:</Text>
-                  <Text fontSize="sm" isTruncated>
-                    {signedTransaction}
                   </Text>
                 </Box>
               )}

@@ -1,0 +1,49 @@
+.multiversx-wallet {
+  --primary-color: #23f7dd;
+  --secondary-color: #1a1a1a;
+  --text-color: #ffffff;
+  --error-color: #ff4444;
+  --success-color: #00c851;
+  --warning-color: #ffbb33;
+  --info-color: #33b5e5;
+}
+
+.multiversx-wallet button {
+  background-color: var(--primary-color);
+  color: var(--secondary-color);
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.multiversx-wallet button:hover {
+  opacity: 0.8;
+}
+
+.multiversx-wallet input {
+  background-color: var(--secondary-color);
+  color: var(--text-color);
+  border: 1px solid var(--primary-color);
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  width: 100%;
+}
+
+.multiversx-wallet .error {
+  color: var(--error-color);
+}
+
+.multiversx-wallet .success {
+  color: var(--success-color);
+}
+
+.multiversx-wallet .warning {
+  color: var(--warning-color);
+}
+
+.multiversx-wallet .info {
+  color: var(--info-color);
+} 

@@ -7,7 +7,7 @@ import EmailSystem from './components/EmailSystem';
 const App: React.FC = () => {
   return (
     <ChakraProvider theme={theme}>
-      <Container maxW="container.xl" py={8}>
+      <Container maxW="container.xl" py={8} className="multiversx-wallet">
         <Stack spacing={8}>
           <Wallet />
           <EmailSystem />
