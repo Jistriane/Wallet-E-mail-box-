@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Fundo circular -->
+  <circle cx="256" cy="256" r="256" fill="#3182CE"/>
+  
+  <!-- Símbolo da carteira -->
+  <path d="M384 160H128C110.327 160 96 174.327 96 192V320C96 337.673 110.327 352 128 352H384C401.673 352 416 337.673 416 320V192C416 174.327 401.673 160 384 160Z" fill="white"/>
+  
+  <!-- Detalhes da carteira -->
+  <path d="M128 160V192H384V160H128Z" fill="#2D3748"/>
+  <path d="M160 224H352V256H160V224Z" fill="#E2E8F0"/>
+  <path d="M160 288H352V320H160V288Z" fill="#E2E8F0"/>
+</svg> 
